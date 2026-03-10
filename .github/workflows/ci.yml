@@ -38,7 +38,7 @@ jobs:
           path: dist/
 
       - name: Tests
-        run: npm test:coverage
+        run: npm test
 
       - name: Update coverage
         run: |
