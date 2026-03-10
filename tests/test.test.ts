@@ -6,6 +6,10 @@ test("fake test", async () => {
   expect(true).toBe(true);
 });
 
+test("test", async ({ page }) => {
+  await page.goto("http://localhost:5173/");
+});
+
 // import { User } from "../src/service/pizzaService";
 
 // async function basicInit(page: Page) {
