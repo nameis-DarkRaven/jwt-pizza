@@ -38,7 +38,8 @@ jobs:
           path: dist/
 
       - name: Tests
-        run: npm test
+        run: npx playwright install --with-deps chromium
+          npm run test:coverage
 
       - name: Update coverage
         run: |
