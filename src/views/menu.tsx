@@ -44,7 +44,7 @@ export default function Menu() {
           <div className="my-2 sm:my-4">Pick your store and pizzas from below. Remember to order extra for a midnight party.</div>
 
           <div className="text-neutral-800 py-3">
-            <select className="py-3 px-4 pe-9 block w-full border-gray-200 rounded-lg text-sm focus:border-orange-500 focus:ring-orange-500 " value={selectedStore} required onChange={(e) => setSelectedStore(e.target.value)}>
+            <select className="py-3 px-4 pe-9 block w-full bg-white border-gray-200 rounded-lg text-sm focus:border-orange-500 focus:ring-orange-500 " value={selectedStore} required onChange={(e) => setSelectedStore(e.target.value)}>
               <option value="">choose store</option>
               {Object.values(storeMap).map((store) => (
                 <option key={store.store.id} value={store.store.id}>
