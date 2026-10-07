@@ -9,7 +9,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "playwright test"
+    "test": "playwright test",
+    "test:coverage": "nyc --reporter=json-summary --reporter=text playwright test"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",
@@ -17,10 +18,13 @@
     "@types/node": "^26.6.4",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
+    "nyc": "^18.0.0",
+    "playwright-test-coverage": "^1.2.12",
     "postcss": "^8.5.29",
     "tailwindcss": "^4.3.3",
     "typescript": "^5.5.4",
-    "vite": "^8.3.3"
+    "vite": "^8.3.3",
+    "vite-plugin-istanbul": "^2.8.0"
   },
   "dependencies": {
     "preline": "^5.0.0",
