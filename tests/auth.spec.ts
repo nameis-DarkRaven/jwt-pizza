@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { mockSignedInUser } from "./testHelpers";
 
 test("diner can log in from home page", async ({ page }) => {
   const diner = { email: "d@jwt.com", password: "diner" };
@@ -118,13 +119,7 @@ test("logging out clears the session", async ({ page }) => {
     roles: [{ role: "diner" }],
   };
 
-  await page.addInitScript((savedToken) => {
-    localStorage.setItem("token", savedToken);
-  }, token);
-
-  await page.route("**/api/user/me", async (route) => {
-    await route.fulfill({ json: diner });
-  });
+  await mockSignedInUser(page, diner, token);
 
   await page.route("**/api/auth", async (route) => {
     expect(route.request().method()).toBe("DELETE");
@@ -220,19 +215,16 @@ test("unauthorized users cannot access protected pages", async ({ page }) => {
 });
 
 test("diner cannot access the admin dashboard by URL", async ({ page }) => {
-  await page.addInitScript(() => {
-    localStorage.setItem("token", "diner-token");
-  });
-  await page.route("**/api/user/me", async (route) => {
-    await route.fulfill({
-      json: {
-        id: "diner",
-        name: "Diner",
-        email: "d@jwt.com",
-        roles: [{ role: "diner" }],
-      },
-    });
-  });
+  await mockSignedInUser(
+    page,
+    {
+      id: "diner",
+      name: "Diner",
+      email: "d@jwt.com",
+      roles: [{ role: "diner" }],
+    },
+    "diner-token",
+  );
 
   await page.goto("/admin-dashboard");
 
@@ -250,18 +242,15 @@ test("diner cannot access the admin dashboard by URL", async ({ page }) => {
 test("franchisee cannot access admin-only franchise creation by URL", async ({
   page,
 }) => {
-  await page.addInitScript(() => {
-    localStorage.setItem("token", "franchisee-token");
-  });
-  await page.route("**/api/user/me", async (route) => {
-    await route.fulfill({
-      json: {
-        id: "franchisee-1",
-        name: "Franchisee",
-        roles: [{ role: "franchisee" }],
-      },
-    });
-  });
+  await mockSignedInUser(
+    page,
+    {
+      id: "franchisee-1",
+      name: "Franchisee",
+      roles: [{ role: "franchisee" }],
+    },
+    "franchisee-token",
+  );
 
   await page.goto("/create-franchise");
 
@@ -274,19 +263,16 @@ test("authenticated API calls send the session token as a bearer credential", as
 }) => {
   const token = "session-token-for-test";
   let authorizationHeader: string | undefined;
-  await page.addInitScript((savedToken) => {
-    localStorage.setItem("token", savedToken);
-  }, token);
-  await page.route("**/api/user/me", async (route) => {
-    await route.fulfill({
-      json: {
-        id: "diner-1",
-        name: "Diner",
-        email: "d@jwt.com",
-        roles: [{ role: "diner" }],
-      },
-    });
-  });
+  await mockSignedInUser(
+    page,
+    {
+      id: "diner-1",
+      name: "Diner",
+      email: "d@jwt.com",
+      roles: [{ role: "diner" }],
+    },
+    token,
+  );
   await page.route("**/api/order", async (route) => {
     authorizationHeader = route.request().headers().authorization;
     await route.fulfill({ json: { orders: [] } });
@@ -308,13 +294,7 @@ test("logout still clears local session when backend logout fails", async ({
     roles: [{ role: "diner" }],
   };
 
-  await page.addInitScript((savedToken) => {
-    localStorage.setItem("token", savedToken);
-  }, token);
-
-  await page.route("**/api/user/me", async (route) => {
-    await route.fulfill({ json: diner });
-  });
+  await mockSignedInUser(page, diner, token);
 
   await page.route("**/api/auth", async (route) => {
     expect(route.request().method()).toBe("DELETE");
