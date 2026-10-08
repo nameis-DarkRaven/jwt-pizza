@@ -160,6 +160,9 @@ test("duplicate registration email is rejected", async ({ page }) => {
   await expect(page.getByText(/Email already exists/i)).toBeVisible();
   await expect(page.getByRole("link", { name: "Logout" })).not.toBeVisible();
   await expect(page.getByRole("link", { name: "Login" })).toBeVisible();
+  await expect
+    .poll(() => page.evaluate(() => localStorage.getItem("token")))
+    .toBeNull();
 });
 
 test("login handles backend outage gracefully", async ({ page }) => {
@@ -216,6 +219,84 @@ test("unauthorized users cannot access protected pages", async ({ page }) => {
   await expect(page.getByText(/your pizza kitchen/i)).not.toBeVisible();
 });
 
+test("diner cannot access the admin dashboard by URL", async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem("token", "diner-token");
+  });
+  await page.route("**/api/user/me", async (route) => {
+    await route.fulfill({
+      json: {
+        id: "diner",
+        name: "Diner",
+        email: "d@jwt.com",
+        roles: [{ role: "diner" }],
+      },
+    });
+  });
+
+  await page.goto("/admin-dashboard");
+
+  await expect(page.getByText(/dropped a pizza on the floor/i)).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Mama Ricci's kitchen" }),
+  ).not.toBeVisible();
+  await expect(
+    page
+      .getByRole("navigation", { name: "Global" })
+      .getByRole("link", { name: "Admin" }),
+  ).not.toBeVisible();
+});
+
+test("franchisee cannot access admin-only franchise creation by URL", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    localStorage.setItem("token", "franchisee-token");
+  });
+  await page.route("**/api/user/me", async (route) => {
+    await route.fulfill({
+      json: {
+        id: "franchisee-1",
+        name: "Franchisee",
+        roles: [{ role: "franchisee" }],
+      },
+    });
+  });
+
+  await page.goto("/create-franchise");
+
+  await expect(page.getByText(/dropped a pizza on the floor/i)).toBeVisible();
+  await expect(page.getByPlaceholder("franchise name")).toHaveCount(0);
+});
+
+test("authenticated API calls send the session token as a bearer credential", async ({
+  page,
+}) => {
+  const token = "session-token-for-test";
+  let authorizationHeader: string | undefined;
+  await page.addInitScript((savedToken) => {
+    localStorage.setItem("token", savedToken);
+  }, token);
+  await page.route("**/api/user/me", async (route) => {
+    await route.fulfill({
+      json: {
+        id: "diner-1",
+        name: "Diner",
+        email: "d@jwt.com",
+        roles: [{ role: "diner" }],
+      },
+    });
+  });
+  await page.route("**/api/order", async (route) => {
+    authorizationHeader = route.request().headers().authorization;
+    await route.fulfill({ json: { orders: [] } });
+  });
+
+  await page.goto("/diner-dashboard");
+
+  await expect.poll(() => authorizationHeader).toBe(`Bearer ${token}`);
+});
+
 test("logout still clears local session when backend logout fails", async ({
   page,
 }) => {
@@ -255,6 +336,11 @@ test("logout still clears local session when backend logout fails", async ({
 });
 
 test("malformed email is rejected by browser validation", async ({ page }) => {
+  let submitted = false;
+  await page.route("**/api/auth", async (route) => {
+    submitted = true;
+    await route.fulfill({ json: {} });
+  });
   await page.goto("/register");
 
   const emailInput = page.locator("#email");
@@ -269,4 +355,10 @@ test("malformed email is rejected by browser validation", async ({ page }) => {
       });
     })
     .toBe(false);
+  await page.getByLabel("Password").fill("valid-password");
+  await page.getByPlaceholder("Full name").fill("Test User");
+  await page.getByRole("button", { name: "Register" }).click();
+
+  await expect(page).toHaveURL(/\/register$/);
+  expect(submitted).toBe(false);
 });

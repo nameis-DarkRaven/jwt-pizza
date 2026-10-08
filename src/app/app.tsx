@@ -34,12 +34,16 @@ declare global {
 
 function ProtectedRoute({
   user,
+  roles,
   children,
 }: {
   user: User | null;
+  roles?: Role[];
   children: React.ReactNode;
 }) {
-  return user ? <>{children}</> : <NotFound />;
+  const hasAccess =
+    user && (!roles || roles.some((role) => Role.isRole(user, role)));
+  return hasAccess ? <>{children}</> : <NotFound />;
 }
 
 export default function App() {
@@ -165,18 +169,23 @@ export default function App() {
       <main className="size-full">
         <Routes>
           {navItems.map((item) => {
-            const element =
-              item.title === "Diner" ||
-              item.title === "Franchise" ||
-              item.title === "Admin" ||
-              item.title === "Create franchise" ||
-              item.title === "Close franchise" ||
-              item.title === "Create store" ||
-              item.title === "Close store" ? (
-                <ProtectedRoute user={user}>{item.component}</ProtectedRoute>
-              ) : (
-                item.component
-              );
+            const routeRoles: Record<string, Role[]> = {
+              Diner: [Role.Diner],
+              Franchise: [Role.Franchisee],
+              Admin: [Role.Admin],
+              "Create franchise": [Role.Admin],
+              "Close franchise": [Role.Admin],
+              "Create store": [Role.Franchisee, Role.Admin],
+              "Close store": [Role.Franchisee, Role.Admin],
+            };
+            const roles = routeRoles[item.title];
+            const element = roles ? (
+              <ProtectedRoute user={user} roles={roles}>
+                {item.component}
+              </ProtectedRoute>
+            ) : (
+              item.component
+            );
 
             return <Route key={item.title} path={item.to} element={element} />;
           })}
