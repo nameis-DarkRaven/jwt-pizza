@@ -32,6 +32,16 @@ declare global {
   }
 }
 
+function ProtectedRoute({
+  user,
+  children,
+}: {
+  user: User | null;
+  children: React.ReactNode;
+}) {
+  return user ? <>{children}</> : <NotFound />;
+}
+
 export default function App() {
   const [user, setUser] = React.useState<User | null>(null);
   const location = useLocation();
@@ -154,9 +164,22 @@ export default function App() {
 
       <main className="size-full">
         <Routes>
-          {navItems.map((item) => (
-            <Route key={item.title} path={item.to} element={item.component} />
-          ))}
+          {navItems.map((item) => {
+            const element =
+              item.title === "Diner" ||
+              item.title === "Franchise" ||
+              item.title === "Admin" ||
+              item.title === "Create franchise" ||
+              item.title === "Close franchise" ||
+              item.title === "Create store" ||
+              item.title === "Close store" ? (
+                <ProtectedRoute user={user}>{item.component}</ProtectedRoute>
+              ) : (
+                item.component
+              );
+
+            return <Route key={item.title} path={item.to} element={element} />;
+          })}
         </Routes>
       </main>
 
