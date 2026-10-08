@@ -1,4 +1,5 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test } from "playwright-test-coverage";
+import type { Page } from "@playwright/test";
 import { mockSignedInUser } from "./testHelpers";
 
 const admin = {
