@@ -98,9 +98,9 @@ test("confirming store closure removes the store", async ({ page }) => {
   ).toBeVisible();
   await page.getByRole("button", { name: "Close", exact: true }).click();
 
-  await expect(api.deletions).toContain(
-    "/api/franchise/franchise-1/store/store-1",
-  );
+  await expect
+    .poll(() => api.deletions)
+    .toContain("/api/franchise/franchise-1/store/store-1");
   await expect(page).toHaveURL(/\/franchise-dashboard$/);
   await expect(
     page.getByRole("heading", { name: "Central Pizza" }),

@@ -286,6 +286,16 @@ test("authenticated API calls send the session token as a bearer credential", as
 test("logout still clears local session when backend logout fails", async ({
   page,
 }) => {
+  await page.addInitScript(() => {
+    window.sessionStorage.setItem("unhandledRejections", "[]");
+    window.addEventListener("unhandledrejection", (event) => {
+      const errors = JSON.parse(
+        window.sessionStorage.getItem("unhandledRejections") || "[]",
+      );
+      errors.push(String(event.reason));
+      window.sessionStorage.setItem("unhandledRejections", JSON.stringify(errors));
+    });
+  });
   const token = "logout-fallback-token";
   const diner = {
     id: "test-diner",
@@ -313,6 +323,13 @@ test("logout still clears local session when backend logout fails", async ({
   await expect
     .poll(() => page.evaluate(() => localStorage.getItem("token")))
     .toBeNull();
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        JSON.parse(window.sessionStorage.getItem("unhandledRejections") || "[]"),
+      ),
+    )
+    .toEqual([]);
 });
 
 test("malformed email is rejected by browser validation", async ({ page }) => {

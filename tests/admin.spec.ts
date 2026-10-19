@@ -175,7 +175,9 @@ test("confirming franchise closure removes the franchise and its stores", async 
   ).toBeVisible();
   await page.getByRole("button", { name: "Close", exact: true }).click();
 
-  await expect(api.deletions).toContain("/api/franchise/franchise-1");
+  await expect
+    .poll(() => api.deletions)
+    .toContain("/api/franchise/franchise-1");
   await expect(page).toHaveURL(/\/admin-dashboard$/);
   await expect(page.getByText("North Pizza")).not.toBeVisible();
   await expect(page.getByText("North Store")).not.toBeVisible();
