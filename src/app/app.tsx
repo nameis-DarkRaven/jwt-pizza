@@ -171,7 +171,6 @@ export default function App() {
           {navItems.map((item) => {
             const routeRoles: Record<string, Role[]> = {
               Diner: [Role.Diner],
-              Franchise: [Role.Franchisee],
               Admin: [Role.Admin],
               "Create franchise": [Role.Admin],
               "Close franchise": [Role.Admin],

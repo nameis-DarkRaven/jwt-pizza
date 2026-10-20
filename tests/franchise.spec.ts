@@ -36,6 +36,17 @@ async function loadFranchisee(page: Page) {
   return { currentFranchise, deletions };
 }
 
+test("non-franchisee can view the franchise information page", async ({
+  page,
+}) => {
+  await page.goto("/franchise-dashboard");
+
+  await expect(
+    page.getByRole("heading", { name: "So you want a piece of the pie?" }),
+  ).toBeVisible();
+  await expect(page.getByText("Call now")).toBeVisible();
+});
+
 test("franchisee dashboard shows its stores", async ({ page }) => {
   await loadFranchisee(page);
 
