@@ -34,13 +34,19 @@ declare global {
 
 function ProtectedRoute({
   user,
+  isLoadingUser,
   roles,
   children,
 }: {
   user: User | null;
+  isLoadingUser: boolean;
   roles?: Role[];
   children: React.ReactNode;
 }) {
+  if (isLoadingUser) {
+    return <div role="status">Loading account...</div>;
+  }
+
   const hasAccess =
     user && (!roles || roles.some((role) => Role.isRole(user, role)));
   return hasAccess ? <>{children}</> : <NotFound />;
@@ -48,12 +54,18 @@ function ProtectedRoute({
 
 export default function App() {
   const [user, setUser] = React.useState<User | null>(null);
+  const [isLoadingUser, setIsLoadingUser] = React.useState(true);
   const location = useLocation();
 
   useEffect(() => {
     (async () => {
-      const user = await pizzaService.getUser();
-      setUser(user);
+      try {
+        setUser(await pizzaService.getUser());
+      } catch {
+        setUser(null);
+      } finally {
+        setIsLoadingUser(false);
+      }
     })();
   }, []);
 
@@ -170,7 +182,6 @@ export default function App() {
         <Routes>
           {navItems.map((item) => {
             const routeRoles: Record<string, Role[]> = {
-              Diner: [Role.Diner],
               Admin: [Role.Admin],
               "Create franchise": [Role.Admin],
               "Close franchise": [Role.Admin],
@@ -178,8 +189,13 @@ export default function App() {
               "Close store": [Role.Franchisee, Role.Admin],
             };
             const roles = routeRoles[item.title];
-            const element = roles ? (
-              <ProtectedRoute user={user} roles={roles}>
+            const requiresAuthentication = item.title === "Diner" || roles;
+            const element = requiresAuthentication ? (
+              <ProtectedRoute
+                user={user}
+                isLoadingUser={isLoadingUser}
+                roles={roles}
+              >
                 {item.component}
               </ProtectedRoute>
             ) : (

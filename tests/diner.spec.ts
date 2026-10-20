@@ -8,8 +8,37 @@ const profile = {
   roles: [{ role: "diner" }],
 };
 
-test("diner dashboard shows the signed-in user's profile", async ({ page }) => {
+test("diner can open their dashboard from the menu", async ({ page }) => {
   await mockSignedInUser(page, profile, "diner-token");
+  await page.route("**/api/order/menu", (route) =>
+    route.fulfill({ json: [] }),
+  );
+  await page.route("**/api/franchise?page=0&limit=20&name=**", (route) =>
+    route.fulfill({ json: { franchises: [], more: false } }),
+  );
+  await page.route("**/api/order", (route) =>
+    route.fulfill({ json: { orders: [] } }),
+  );
+
+  await page.goto("/menu");
+  await page.getByRole("link", { name: "TD" }).click();
+
+  await expect(page).toHaveURL(/\/diner-dashboard$/);
+  await expect(
+    page.getByRole("heading", { name: "Your pizza kitchen" }),
+  ).toBeVisible();
+  await expect(page.getByText(profile.name, { exact: true })).toBeVisible();
+});
+
+test("signed-in user can access their profile without role claims", async ({
+  page,
+}) => {
+  const user = {
+    id: "diner-1",
+    name: "Test Diner",
+    email: "diner@example.test",
+  };
+  await mockSignedInUser(page, user, "diner-token");
   await page.route("**/api/order", (route) =>
     route.fulfill({ json: { orders: [] } }),
   );
@@ -23,7 +52,37 @@ test("diner dashboard shows the signed-in user's profile", async ({ page }) => {
   await expect(
     page.getByText("diner@example.test", { exact: true }),
   ).toBeVisible();
-  await expect(page.getByText("diner", { exact: true })).toBeVisible();
+});
+
+test("diner session restores before the dashboard shows access denied", async ({
+  page,
+}) => {
+  let finishUserRequest: () => void = () => {};
+  const userRequestGate = new Promise<void>((resolve) => {
+    finishUserRequest = resolve;
+  });
+  await page.addInitScript(() => {
+    localStorage.setItem("token", "slow-diner-token");
+  });
+  await page.route("**/api/user/me", async (route) => {
+    await userRequestGate;
+    await route.fulfill({ json: profile });
+  });
+  await page.route("**/api/order", (route) =>
+    route.fulfill({ json: { orders: [] } }),
+  );
+
+  await page.goto("/diner-dashboard");
+  await page.waitForRequest("**/api/user/me");
+
+  await expect(page.getByRole("status")).toHaveText("Loading account...");
+  await expect(
+    page.getByText(/dropped a pizza on the floor/i),
+  ).not.toBeVisible();
+  finishUserRequest();
+  await expect(
+    page.getByRole("heading", { name: "Your pizza kitchen" }),
+  ).toBeVisible();
 });
 
 test("diner dashboard shows order history", async ({ page }) => {
