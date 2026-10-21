@@ -9,11 +9,17 @@ import { Order, OrderHistory, Role, User } from "../service/pizzaService";
 
 interface Props {
   user: User | null;
+  setUser: (user: User) => void;
 }
 
 export default function DinerDashboard(props: Props) {
   const user = props.user || ({} as User);
   const [orders, setOrders] = React.useState<Order[]>([]);
+  const [updateError, setUpdateError] = React.useState("");
+  const [isUpdating, setIsUpdating] = React.useState(false);
+  const nameRef = React.useRef<HTMLInputElement>(null);
+  const emailRef = React.useRef<HTMLInputElement>(null);
+  const passwordRef = React.useRef<HTMLInputElement>(null);
 
   React.useEffect(() => {
     (async () => {
@@ -36,6 +42,35 @@ export default function DinerDashboard(props: Props) {
     setTimeout(() => {
       HSOverlay.close(document.getElementById("hs-jwt-modal")!);
     }, 100);
+  }
+
+  function cancelUpdateUser() {
+    if (passwordRef.current) passwordRef.current.value = "";
+    setUpdateError("");
+    closeUpdateUser();
+  }
+
+  async function updateUser() {
+    setUpdateError("");
+    setIsUpdating(true);
+    const updatedUser: User = {
+      ...user,
+      name: nameRef.current?.value,
+      email: emailRef.current?.value,
+      password: passwordRef.current?.value || undefined,
+    };
+    try {
+      const savedUser = await pizzaService.updateUser(updatedUser);
+      if (nameRef.current) nameRef.current.value = savedUser.name || "";
+      if (emailRef.current) emailRef.current.value = savedUser.email || "";
+      if (passwordRef.current) passwordRef.current.value = "";
+      props.setUser(savedUser);
+      closeUpdateUser();
+    } catch {
+      setUpdateError("Unable to update your profile. Please try again.");
+    } finally {
+      setIsUpdating(false);
+    }
   }
 
   return (
@@ -161,12 +196,17 @@ export default function DinerDashboard(props: Props) {
                 type="button"
                 aria-label="Close edit user dialog"
                 className="flex justify-center items-center size-7 text-sm font-semibold rounded-full border border-transparent text-gray-800 hover:bg-gray-100"
-                data-hs-overlay="#hs-jwt-modal"
+                onClick={cancelUpdateUser}
               >
                 <CloseIcon className="" />
               </button>
             </div>
             <div className="p-4 grid grid-cols-5 gap-2 items-center text-start">
+              {updateError && (
+                <div role="alert" className="col-span-5 text-red-700">
+                  {updateError}
+                </div>
+              )}
               <label
                 htmlFor="update-name"
                 className="font-semibold text-gray-800"
@@ -177,6 +217,7 @@ export default function DinerDashboard(props: Props) {
                 id="update-name"
                 type="text"
                 defaultValue={user.name}
+                ref={nameRef}
                 className="col-span-4 border border-gray-300 rounded-md p-1"
               />
               <label
@@ -189,6 +230,7 @@ export default function DinerDashboard(props: Props) {
                 id="update-email"
                 type="email"
                 defaultValue={user.email}
+                ref={emailRef}
                 className="col-span-4 border border-gray-300 rounded-md p-1"
               />
               <label
@@ -201,6 +243,7 @@ export default function DinerDashboard(props: Props) {
                 id="update-password"
                 type="password"
                 defaultValue=""
+                ref={passwordRef}
                 className="col-span-4 border border-gray-300 rounded-md p-1"
               />
             </div>
@@ -208,7 +251,8 @@ export default function DinerDashboard(props: Props) {
               <button
                 type="button"
                 className="py-2 px-3 text-sm font-medium rounded-lg border border-gray-200 bg-white text-gray-800 shadow-sm hover:bg-gray-50"
-                onClick={closeUpdateUser}
+                disabled={isUpdating}
+                onClick={() => void updateUser()}
               >
                 Update
               </button>

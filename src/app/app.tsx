@@ -72,7 +72,7 @@ export default function App() {
   useEffect(() => {
     HSStaticMethods.autoInit();
     window.scrollTo(0, 0);
-  }, [location.pathname]);
+  }, [location.pathname, isLoadingUser]);
 
   function loggedIn() {
     return !!user;
@@ -83,16 +83,12 @@ export default function App() {
   function isAdmin() {
     return Role.isRole(user, Role.Admin);
   }
-  function isNotAdmin() {
-    return !isAdmin();
-  }
-
   const navItems = [
     { title: "Home", to: "/", component: <Home />, display: [] },
     {
       title: "Diner",
       to: "/diner-dashboard",
-      component: <DinerDashboard user={user} />,
+      component: <DinerDashboard user={user} setUser={setUser} />,
       display: [],
     },
     { title: "Order", to: "/menu", component: <Menu />, display: ["nav"] },
@@ -100,7 +96,6 @@ export default function App() {
       title: "Franchise",
       to: "/franchise-dashboard",
       component: <FranchiseDashboard user={user} />,
-      constraints: [isNotAdmin],
       display: ["nav", "footer"],
     },
     { title: "About", to: "/about", component: <About />, display: ["footer"] },

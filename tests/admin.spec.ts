@@ -23,6 +23,33 @@ const franchises = [
   { id: "franchise-4", name: "West Pizza", admins: [], stores: [] },
 ];
 
+const users = [
+  {
+    id: "user-1",
+    name: "Avery Diner",
+    email: "avery@example.test",
+    roles: [{ role: "diner" }],
+  },
+  {
+    id: "user-2",
+    name: "Casey Owner",
+    email: "casey@example.test",
+    roles: [{ role: "franchisee", objectId: "franchise-1" }],
+  },
+  ...Array.from({ length: 8 }, (_, index) => ({
+    id: `user-${index + 3}`,
+    name: `Diner ${index + 3}`,
+    email: `diner-${index + 3}@example.test`,
+    roles: [{ role: "diner" }],
+  })),
+  {
+    id: "user-11",
+    name: "Jordan Admin",
+    email: "jordan@example.test",
+    roles: [{ role: "admin" }],
+  },
+];
+
 async function mockFranchises(page: Page) {
   const currentFranchises = structuredClone(franchises);
   const filters: string[] = [];
@@ -77,6 +104,49 @@ async function mockFranchises(page: Page) {
   return { filters, deletions };
 }
 
+async function mockUsers(page: Page) {
+  const currentUsers = structuredClone(users);
+  const requests: string[] = [];
+  const deletions: string[] = [];
+  await page.route("**/api/user**", async (route) => {
+    const url = new URL(route.request().url());
+    const method = route.request().method();
+    if (url.pathname === "/api/user/me") {
+      await route.fulfill({ json: admin });
+      return;
+    }
+    if (method === "DELETE") {
+      deletions.push(url.pathname);
+      const pathSegments = url.pathname.split("/");
+      const userId = pathSegments[pathSegments.length - 1];
+      const index = currentUsers.findIndex((user) => user.id === userId);
+      if (index !== -1) currentUsers.splice(index, 1);
+      await route.fulfill({ json: { message: "user deleted" } });
+      return;
+    }
+    if (method === "GET" && url.pathname === "/api/user") {
+      const pageNumber = Number(url.searchParams.get("page") || 1);
+      const pageSize = Number(url.searchParams.get("limit") || 10);
+      const filter = url.searchParams.get("name") || "*";
+      requests.push(filter);
+      const searchText = filter.replace(/\*/g, "").toLowerCase();
+      const matchingUsers = currentUsers.filter((user) =>
+        user.name.toLowerCase().includes(searchText),
+      );
+      const offset = (pageNumber - 1) * pageSize;
+      await route.fulfill({
+        json: {
+          users: matchingUsers.slice(offset, offset + pageSize),
+          more: offset + pageSize < matchingUsers.length,
+        },
+      });
+      return;
+    }
+    await route.fallback();
+  });
+  return { requests, deletions };
+}
+
 test("admin dashboard shows franchises and stores", async ({ page }) => {
   await mockSignedInUser(page, admin, "admin-token");
   await mockFranchises(page);
@@ -90,6 +160,99 @@ test("admin dashboard shows franchises and stores", async ({ page }) => {
   await expect(page.getByText("Alex Owner")).toBeVisible();
   await expect(page.getByText("North Store")).toBeVisible();
   await expect(page.getByText("42 ₿")).toBeVisible();
+  await expect(
+    page
+      .getByRole("navigation", { name: "Global" })
+      .getByRole("link", { name: "Admin" }),
+  ).toBeVisible();
+});
+
+test("admin can visit the franchise page and return to franchise management", async ({
+  page,
+}) => {
+  await mockSignedInUser(page, admin, "admin-token");
+  await mockFranchises(page);
+  await page.route("**/api/franchise/admin-1", (route) =>
+    route.fulfill({ json: [] }),
+  );
+
+  await page.goto("/");
+  const globalNavigation = page.getByRole("navigation", { name: "Global" });
+  await expect(
+    globalNavigation.getByRole("link", { name: "Franchise" }),
+  ).toBeVisible();
+  await globalNavigation.getByRole("link", { name: "Franchise" }).click();
+  await expect(
+    page.getByRole("heading", { name: "So you want a piece of the pie?" }),
+  ).toBeVisible();
+
+  await globalNavigation.getByRole("link", { name: "Admin" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Mama Ricci's kitchen" }),
+  ).toBeVisible();
+  await expect(page.getByText("North Pizza")).toBeVisible();
+});
+
+test("admin can list users with their roles", async ({ page }) => {
+  await mockSignedInUser(page, admin, "admin-token");
+  await mockFranchises(page);
+  await mockUsers(page);
+  await page.goto("/admin-dashboard");
+
+  await expect(page.getByRole("heading", { name: "Users" })).toBeVisible();
+  await expect(page.getByRole("row", { name: /Avery Diner/ })).toContainText(
+    "avery@example.test",
+  );
+  await expect(page.getByRole("row", { name: /Avery Diner/ })).toContainText(
+    "diner",
+  );
+  await expect(page.getByRole("row", { name: /Casey Owner/ })).toContainText(
+    "Franchisee on franchise-1",
+  );
+});
+
+test("admin can filter users by name", async ({ page }) => {
+  await mockSignedInUser(page, admin, "admin-token");
+  await mockFranchises(page);
+  const api = await mockUsers(page);
+  await page.goto("/admin-dashboard");
+
+  await page.getByPlaceholder("Filter users").fill("Avery");
+  await page.getByRole("button", { name: "Filter users" }).click();
+
+  await expect(page.getByRole("row", { name: /Avery Diner/ })).toBeVisible();
+  await expect(page.getByRole("row", { name: /Casey Owner/ })).toHaveCount(0);
+  await expect.poll(() => api.requests).toContain("*Avery*");
+});
+
+test("admin can paginate through users", async ({ page }) => {
+  await mockSignedInUser(page, admin, "admin-token");
+  await mockFranchises(page);
+  await mockUsers(page);
+  await page.goto("/admin-dashboard");
+
+  await expect(page.getByRole("row", { name: /Avery Diner/ })).toBeVisible();
+  await expect(page.getByRole("row", { name: /Jordan Admin/ })).toHaveCount(0);
+  await page.getByRole("button", { name: "Next users page" }).click();
+
+  await expect(page.getByRole("row", { name: /Jordan Admin/ })).toBeVisible();
+  await expect(page.getByRole("row", { name: /Avery Diner/ })).toHaveCount(0);
+});
+
+test("admin can confirm deletion of a user", async ({ page }) => {
+  await mockSignedInUser(page, admin, "admin-token");
+  await mockFranchises(page);
+  const api = await mockUsers(page);
+  page.on("dialog", (dialog) => dialog.accept());
+  await page.goto("/admin-dashboard");
+
+  await page
+    .getByRole("row", { name: /Avery Diner/ })
+    .getByRole("button", { name: "Delete" })
+    .click();
+
+  await expect(api.deletions).toContain("/api/user/user-1");
+  await expect(page.getByRole("row", { name: /Avery Diner/ })).toHaveCount(0);
 });
 
 test("filtering franchises shows matching results", async ({ page }) => {
