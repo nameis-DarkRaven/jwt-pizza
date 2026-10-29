@@ -42,10 +42,10 @@ jobs:
           color=$(echo "$coverage < 80" | bc | awk '{if ($1) print "red"; else print "green"}')
           curl -s -X POST "https://pizza-factory.cs329.click/api/badge/${{ secrets.NET_ID }}/jwtpizzacoverage?label=Coverage&value=$coverage%25&color=$color" -H "authorization: bearer ${{ secrets.FACTORY_API_KEY }}"
 
-      - name: Update pages artifact
-        uses: actions/upload-pages-artifact@v7.0.2
+      - name: Update dist artifact
+        uses: actions/upload-artifact@v7.0.2
         with:
-          name: packagep
+          name: package
           path: dist/
 
   deploy:
