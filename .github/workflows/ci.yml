@@ -52,6 +52,7 @@ jobs:
     needs: build
     permissions:
       id-token: write
+      contents: read
     runs-on: ubuntu-latest
     env:
       version: ${{needs.build.outputs.version}}
